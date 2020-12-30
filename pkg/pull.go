@@ -65,12 +65,12 @@ func (s Service) pullImage(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
-	scheduler := s.scheduleInKubernetes
+	scheduler := s.runSkopeoRemote
 	err = semSkopeo.Acquire(ctx, 1)
 	if err == nil {
 		log.Printf("pull locally %s", from)
 		defer semSkopeo.Release(1)
-		scheduler = scheduleLocal
+		scheduler = runSkopeoLocal
 	} else {
 		log.Printf("pull scheduled %s", from)
 	}

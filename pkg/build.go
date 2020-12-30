@@ -16,10 +16,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/s3"
-	"github.com/aws/aws-sdk-go/service/s3/s3manager"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,13 +37,6 @@ type buildConfig struct {
 	tags            []string
 	registryAuth    dockerConfig
 	contextFilePath string
-}
-
-// ObjectStore manages access to a S3 compatible file store.
-type ObjectStore struct {
-	Client   *s3.S3
-	Uploader *s3manager.Uploader
-	Bucket   string
 }
 
 func (s Service) build(w http.ResponseWriter, r *http.Request) {
@@ -207,66 +196,11 @@ func printBuildHelpText(w http.ResponseWriter, err error) {
 func (s Service) buildInKubernetes(w http.ResponseWriter, r *http.Request, cfg *buildConfig) {
 	ctx := r.Context()
 
-	err := s.objectStore.storeContext(ctx, r.Body, cfg)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(fmt.Sprintf("store context: %v", err)))
-		log.Printf("execute build: %v", err)
-		return
-	}
-	defer func() {
-		s.objectStore.deleteContext(ctx, cfg)
-	}()
-
-	err = s.executeBuild(ctx, cfg, w)
+	err := s.executeBuild(ctx, cfg, w)
 	if err != nil {
 		log.Printf("execute build: %v", err)
 		return
 	}
-}
-
-func (o ObjectStore) storeContext(ctx context.Context, r io.Reader, cfg *buildConfig) error {
-	path := fmt.Sprintf("%d.tar", time.Now().UnixNano())
-	cfg.contextFilePath = path
-
-	_, err := o.Uploader.Upload(&s3manager.UploadInput{
-		Bucket:      aws.String(o.Bucket),
-		Key:         aws.String(path),
-		ContentType: aws.String("application/x-tar"),
-		Body:        r,
-	})
-	if err != nil {
-		return fmt.Errorf("upload build context to bucket: %v", err)
-	}
-
-	return nil
-}
-
-func (o ObjectStore) presignContext(cfg *buildConfig) (string, error) {
-
-	objectRequest, _ := o.Client.GetObjectRequest(&s3.GetObjectInput{
-		Bucket: aws.String(o.Bucket),
-		Key:    aws.String(cfg.contextFilePath),
-	})
-
-	url, err := objectRequest.Presign(MaxExecutionTime)
-	if err != nil {
-		return "", fmt.Errorf("presign GET %s: %v", cfg.contextFilePath, err)
-	}
-
-	return url, nil
-}
-
-func (o ObjectStore) deleteContext(ctx context.Context, cfg *buildConfig) error {
-	_, err := o.Client.DeleteObjectWithContext(ctx, &s3.DeleteObjectInput{
-		Bucket: aws.String(o.Bucket),
-		Key:    aws.String(cfg.contextFilePath),
-	})
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func (s Service) executeBuild(ctx context.Context, cfg *buildConfig, w http.ResponseWriter) error {
@@ -446,7 +380,7 @@ func buildLocally(w http.ResponseWriter, r *http.Request, cfg *buildConfig) {
 	o := &output{w: w}
 	d := &digestParser{w: o}
 
-	err := buildLocallyError(r.Context(), d, r.Body, cfg)
+	err := buildLocallyError(r.Context(), d, r.Body, "127.0.0.1", cfg)
 	if err != nil {
 		log.Printf("execute build: %v", err)
 		o.Errorf("execute build: %v", err)
@@ -461,7 +395,7 @@ func buildLocally(w http.ResponseWriter, r *http.Request, cfg *buildConfig) {
 	}
 }
 
-func buildLocallyError(ctx context.Context, w io.Writer, r io.Reader, cfg *buildConfig) error {
+func buildLocallyError(ctx context.Context, w io.Writer, r io.Reader, buildkitdIP string, cfg *buildConfig) error {
 	defer os.RemoveAll("/root/context")
 
 	script := `
@@ -533,7 +467,7 @@ tar -xf -
 set -exuo pipefail
 cd /root/context
 buildctl \
---addr tcp://127.0.0.1:1234 \
+--addr tcp://%s:1234 \
  build \
  --frontend dockerfile.v0 \
  --local context=. \
@@ -545,7 +479,7 @@ buildctl \
  %s \
  --export-cache=type=registry,ref=wedding-registry:5000/cache-repo,mode=max \
  --import-cache=type=registry,ref=wedding-registry:5000/cache-repo
-`, dockerfileDir, dockerfileName, buildargs, labels, target, destination)
+`, buildkitdIP, dockerfileDir, dockerfileName, buildargs, labels, target, destination)
 
 	cmd = exec.CommandContext(
 		ctx,

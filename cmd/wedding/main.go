@@ -8,14 +8,8 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/s3"
-	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	wedding "github.com/damoon/wedding/pkg"
 	"github.com/urfave/cli/v2"
 	"k8s.io/client-go/kubernetes"
@@ -38,12 +32,6 @@ func main() {
 				Usage: "Start the server.",
 				Flags: []cli.Flag{
 					&cli.StringFlag{Name: "addr", Value: ":2376", Usage: "Address to run service on."},
-					&cli.StringFlag{Name: "s3-endpoint", Required: true, Usage: "s3 endpoint."},
-					&cli.StringFlag{Name: "s3-access-key-file", Required: true, Usage: "Path to s3 access key."},
-					&cli.StringFlag{Name: "s3-secret-key-file", Required: true, Usage: "Path to s3 secret access key."},
-					&cli.BoolFlag{Name: "s3-ssl", Value: true, Usage: "s3 uses SSL."},
-					&cli.StringFlag{Name: "s3-location", Value: "us-east-1", Usage: "s3 bucket location."},
-					&cli.StringFlag{Name: "s3-bucket", Required: true, Usage: "s3 bucket name."},
 				},
 				Action: run,
 			},
@@ -73,19 +61,6 @@ func run(c *cli.Context) error {
 	log.Printf("version: %v", gitRef)
 	log.Printf("git commit: %v", gitHash)
 
-	log.Println("set up storage")
-
-	storage, err := setupObjectStore(
-		c.String("s3-endpoint"),
-		c.String("s3-access-key-file"),
-		c.String("s3-secret-key-file"),
-		c.Bool("s3-ssl"),
-		c.String("s3-location"),
-		c.String("s3-bucket"))
-	if err != nil {
-		return fmt.Errorf("setup minio s3 client: %v", err)
-	}
-
 	log.Println("set up kubernetes client")
 
 	kubernetesClient, namespace, err := setupKubernetesClient()
@@ -95,7 +70,7 @@ func run(c *cli.Context) error {
 
 	log.Println("set up service")
 
-	svc := wedding.NewService(gitHash, gitRef, storage, kubernetesClient, namespace)
+	svc := wedding.NewService(gitHash, gitRef, kubernetesClient, namespace)
 
 	svcServer := httpServer(svc, c.String("addr"))
 
@@ -118,51 +93,6 @@ func run(c *cli.Context) error {
 	log.Println("shutdown complete")
 
 	return nil
-}
-
-func setupObjectStore(
-	endpoint, accessKeyPath, secretKeyPath string,
-	useSSL bool,
-	region, bucket string,
-) (*wedding.ObjectStore, error) {
-	accessKeyBytes, err := ioutil.ReadFile(accessKeyPath)
-	if err != nil {
-		return nil, fmt.Errorf("reading secret access key from %s: %v", accessKeyPath, err)
-	}
-
-	secretKeyBytes, err := ioutil.ReadFile(secretKeyPath)
-	if err != nil {
-		return nil, fmt.Errorf("reading secret access key from %s: %v", secretKeyPath, err)
-	}
-
-	accessKey := strings.TrimSpace(string(accessKeyBytes))
-	secretKey := strings.TrimSpace(string(secretKeyBytes))
-
-	endpointProtocol := "http"
-	if useSSL {
-		endpointProtocol = "https"
-	}
-
-	s3Config := &aws.Config{
-		Credentials:      credentials.NewStaticCredentials(accessKey, secretKey, ""),
-		Endpoint:         aws.String(fmt.Sprintf("%s://%s", endpointProtocol, endpoint)),
-		Region:           aws.String(region),
-		DisableSSL:       aws.Bool(!useSSL),
-		S3ForcePathStyle: aws.Bool(true),
-	}
-
-	sess, err := session.NewSession(s3Config)
-	if err != nil {
-		return nil, fmt.Errorf("set up aws session: %v", err)
-	}
-
-	s3Client := s3.New(sess)
-
-	return &wedding.ObjectStore{
-		Client:   s3Client,
-		Uploader: s3manager.NewUploader(sess),
-		Bucket:   bucket,
-	}, nil
 }
 
 func setupKubernetesClient() (*kubernetes.Clientset, string, error) {

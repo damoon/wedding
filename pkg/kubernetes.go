@@ -16,6 +16,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 )
 
 func scheduleLocal(ctx context.Context, w io.Writer, processName, script, dockerJSON string) error {
@@ -224,6 +225,32 @@ printLogs:
 
 		w.Write([]byte(string(buf[:n])))
 	}
+}
+
+func awaitPod(ctx context.Context, clientset *kubernetes.Clientset, pod, namespace string) (*corev1.Pod, error) {
+	for {
+		pod, err := clientset.CoreV1().Pods(namespace).Get(ctx, pod, metav1.GetOptions{})
+		if err != nil {
+			return nil, fmt.Errorf("list pods: %v", err)
+		}
+
+	PODS:
+		if pod.Status.Phase != corev1.PodRunning {
+			continue
+		}
+
+		for _, conditions := range pod.Status.Conditions {
+			if conditions.Status != corev1.ConditionTrue {
+				continue PODS
+			}
+		}
+
+		return pod, nil
+
+		time.Sleep(time.Second)
+	}
+
+	return nil, fmt.Errorf("no running healthy pod not found")
 }
 
 func (s Service) podStatus(ctx context.Context, podName string) (corev1.PodPhase, error) {

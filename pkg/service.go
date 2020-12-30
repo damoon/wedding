@@ -33,15 +33,13 @@ var (
 // Service runs the wedding server.
 type Service struct {
 	router           http.Handler
-	objectStore      *ObjectStore
 	namespace        string
 	kubernetesClient *kubernetes.Clientset
 }
 
 // NewService creates a new service server and initiates the routes.
-func NewService(gitHash, gitRef string, objectStore *ObjectStore, kubernetesClient *kubernetes.Clientset, namespace string) *Service {
+func NewService(gitHash, gitRef string, kubernetesClient *kubernetes.Clientset, namespace string) *Service {
 	srv := &Service{
-		objectStore:      objectStore,
 		namespace:        namespace,
 		kubernetesClient: kubernetesClient,
 	}

@@ -31,12 +31,12 @@ func (s Service) pushImage(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
-	scheduler := s.scheduleInKubernetes
+	scheduler := s.runSkopeoRemote
 	err = semSkopeo.Acquire(ctx, 1)
 	if err == nil {
 		log.Printf("push locally %s", to)
 		defer semSkopeo.Release(1)
-		scheduler = scheduleLocal
+		scheduler = runSkopeoLocal
 	} else {
 		log.Printf("push scheduled %s", to)
 	}
