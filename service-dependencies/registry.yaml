@@ -38,6 +38,7 @@ spec:
             requests:
               cpu: "100m"
               memory: "500Mi"
+          # TODO: healthy while minio is down
           readinessProbe:
             httpGet:
               path: /debug/health

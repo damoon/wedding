@@ -9,19 +9,35 @@ spec:
   selector:
     app: wedding-minio
 ---
+apiVersion: v1
+kind: Service
+metadata:
+  name: wedding-minio-statefulset
+spec:
+  publishNotReadyAddresses: true
+  clusterIP: None
+  ports:
+    - name: minio
+      port: 9000
+  selector:
+    app: wedding-minio
+---
+# TODO: create issue at minio github: dns lookup run in a loop without delay, result: a not yet started pod and its missing endpoint in dns server spam stderr
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: wedding-minio
 spec:
+  serviceName: wedding-minio-statefulset
   selector:
     matchLabels:
       app: wedding-minio
-  strategy:
-    type: Recreate
-  replicas: 1
+  podManagementPolicy: Parallel
+  replicas: 4
   template:
     metadata:
+      annotations:
+        pod.alpha.kubernetes.io/initialized: "true"
       labels:
         app: wedding-minio
     spec:
@@ -30,7 +46,10 @@ spec:
           image: minio/minio:RELEASE.2020-12-29T23-29-29Z
           args:
             - server
-            - /home/shared
+            - http://wedding-minio-0.wedding-minio-statefulset/data
+            - http://wedding-minio-1.wedding-minio-statefulset/data
+            - http://wedding-minio-2.wedding-minio-statefulset/data
+            - http://wedding-minio-3.wedding-minio-statefulset/data
           envFrom:
             - secretRef:
                 name: wedding-minio
@@ -57,11 +76,16 @@ spec:
                   - "sleep 10"
           volumeMounts:
             - name: data
-              mountPath: /home/shared
-      volumes:
-        - name: data
-          persistentVolumeClaim:
-            claimName: wedding-minio
+              mountPath: /data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 10Gi
 ---
 apiVersion: v1
 kind: Secret
@@ -71,17 +95,6 @@ type: Opaque
 stringData:
   MINIO_ACCESS_KEY: minio123
   MINIO_SECRET_KEY: minio456
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: wedding-minio
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 20Gi
 ---
 apiVersion: batch/v1
 kind: Job
