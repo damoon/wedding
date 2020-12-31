@@ -115,6 +115,7 @@ spec:
             - |
               set -euxo pipefail
               mc config host add minio http://wedding-minio:9000 $(cat /secret/minio/MINIO_ACCESS_KEY) $(cat /secret/minio/MINIO_SECRET_KEY)
+              until timeout 10 mc admin info minio; do sleep 1; done
               mc mb minio/contexts --ignore-existing
               mc mb minio/registry --ignore-existing
           resources:
