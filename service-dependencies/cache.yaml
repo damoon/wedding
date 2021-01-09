@@ -1,0 +1,92 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: wedding-docker-registry-proxy
+spec:
+  ports:
+    - name: proxy
+      port: 3128
+  selector:
+    app: wedding-docker-registry-proxy
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: wedding-docker-registry-proxy
+spec:
+  serviceName: wedding-docker-registry-proxy
+  selector:
+    matchLabels:
+      app: wedding-docker-registry-proxy
+  podManagementPolicy: Parallel
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: wedding-docker-registry-proxy
+    spec:
+      containers:
+        - name: docker-registry-proxy
+          image: ghcr.io/rpardini/docker-registry-proxy:0.6.1
+          command:
+            - sh
+            - -c
+            - |
+              rm -rf /ca/*
+              cat /ca_secret/ca.crt > /ca/ca.crt
+              cat /ca_secret/ca.key > /ca/ca.key
+              cat /ca_secret/ca.srl > /ca/ca.srl
+              /entrypoint.sh
+          ports:
+            - name: proxy
+              containerPort: 3128
+          resources:
+            limits:
+              cpu: "1000m"
+              memory: "100Mi"
+            requests:
+              cpu: "100m"
+              memory: "30Mi"
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 3128
+          readinessProbe:
+            exec:
+              command:
+              - sh
+              - -c
+              - http_proxy=127.0.0.1:3128 wget -O /dev/null domain.tld
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                  - sleep
+                  - "10"
+          volumeMounts:
+            - name: data
+              mountPath: /docker_mirror_cache
+            - name: ca
+              mountPath: /ca_secret
+      volumes:
+        - name: ca
+          secret:
+            secretName: wedding-docker-registry-proxy-ca
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 32Gi
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: wedding-docker-registry-proxy
+type: Opaque
+stringData:
+  MINIO_ACCESS_KEY: minio123
+  MINIO_SECRET_KEY: minio456
