@@ -16,3 +16,20 @@ k8s_resource(
   new_name='registry',
   port_forwards=5000,
 )
+
+k8s_yaml('cache.yaml')
+k8s_resource(
+  'wedding-docker-registry-proxy',
+  new_name='docker hub proxy',
+  port_forwards=3128,
+)
+
+load('ext://secret', 'secret_create_generic')
+secret_create_generic(
+  'wedding-docker-registry-proxy-ca',
+  from_file=[
+    'ca.crt=./cache/ca.crt',
+    'ca.key=./cache/ca.key',
+    'ca.srl=./cache/ca.srl',
+  ],
+)
