@@ -44,8 +44,8 @@ spec:
               port: 5000
           readinessProbe:
             httpGet:
-              path: /debug/health
-              port: 5001
+              path: /v2/_catalog
+              port: 5000
           lifecycle:
             preStop:
               exec:
@@ -76,33 +76,6 @@ spec:
           volumeMounts:
             - name: config
               mountPath: /etc/docker/registry/
-        - name: bucket-healthcheck
-          image: minio/mc:RELEASE.2020-12-18T10-53-53Z
-          command:
-            - sh
-            - -c
-            # TODO: sleep infinity
-            - |
-              set -euxo pipefail
-              mc config host add minio http://wedding-minio:9000 $(cat /secret/minio/MINIO_ACCESS_KEY) $(cat /secret/minio/MINIO_SECRET_KEY)
-              while sleep 1000; do sleep 1000; done
-          readinessProbe:
-            exec:
-              command:
-                - mc
-                - stat
-                - minio/registry
-          resources:
-            limits:
-              cpu: 20m
-              memory: 50Mi
-            requests:
-              cpu: 20m
-              memory: 50Mi
-          volumeMounts:
-            - name: minio
-              mountPath: "/secret/minio"
-              readOnly: true
       volumes:
         - name: minio
           secret:
@@ -174,8 +147,3 @@ data:
       addr: :5000
       headers:
         X-Content-Type-Options: [nosniff]
-      debug:
-        addr: :5001
-    health:
-      storagedriver:
-        enabled: true

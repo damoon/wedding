@@ -53,6 +53,9 @@ spec:
           envFrom:
             - secretRef:
                 name: wedding-minio
+          env:
+            - name: KUBERNETES_REPLICA_SET
+              value: "yes"
           ports:
             - name: http
               containerPort: 9000
@@ -63,9 +66,13 @@ spec:
             requests:
               cpu: "100m"
               memory: "1Gi"
-          readinessProbe:
+          livenessProbe:
             httpGet:
               path: /minio/health/live
+              port: 9000
+          readinessProbe:
+            httpGet:
+              path: /minio/health/cluster
               port: 9000
           lifecycle:
             preStop:
@@ -73,7 +80,7 @@ spec:
                 command:
                   - sh
                   - -c
-                  - "sleep 10"
+                  - until [[ $(curl --silent --fail --max-time 5 --write-out "%{http_code}" http://127.0.0.1:9000/minio/health/cluster\?maintenance\=true) = "200" ]]; do sleep 1; done
           volumeMounts:
             - name: data
               mountPath: /data
