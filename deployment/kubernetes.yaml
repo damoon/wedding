@@ -25,6 +25,21 @@ spec:
         app: wedding
     spec:
       serviceAccountName: wedding
+      initContainers:
+        - name: prepare-http-proxy-ca
+          image: moby/buildkit:v0.8.1
+          command:
+            - sh
+            - -c
+            - |
+              cp /ca_secret/ca.crt /usr/local/share/ca-certificates/http_proxy.crt
+              update-ca-certificates
+              cp -a /etc/ssl/certs/* /ca
+          volumeMounts:
+            - name: ca
+              mountPath: "/ca"
+            - name: ca-secret
+              mountPath: /ca_secret
       containers:
         - name: wedding
           image: davedamoon/wedding:latest
@@ -37,6 +52,12 @@ spec:
           env:
             - name: KEEP_FAILED_PODS
               value: "yes"
+            - name: HTTP_PROXY
+              value: http://wedding-docker-registry-proxy:3128
+            - name: HTTPS_PROXY
+              value: http://wedding-docker-registry-proxy:3128
+            - name: NO_PROXY
+              value: 10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,127.0.0.0/8,wedding-registry,wedding-minio
           ports:
             - name: wedding
               containerPort: 2376
@@ -48,6 +69,8 @@ spec:
             - name: minio
               mountPath: "/secret/minio"
               readOnly: true
+            - name: ca
+              mountPath: "/etc/ssl/certs/"
           resources:
             requests:
               memory: "200Mi"
@@ -60,10 +83,19 @@ spec:
           args:
             - --addr=tcp://127.0.0.1:1234
             - --oci-worker-no-process-sandbox
+          env:
+            - name: HTTP_PROXY
+              value: http://wedding-docker-registry-proxy:3128
+            - name: HTTPS_PROXY
+              value: http://wedding-docker-registry-proxy:3128
+            - name: NO_PROXY
+              value: 10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,127.0.0.0/8,wedding-registry,wedding-minio
           volumeMounts:
             - name: buildkitd-config
               mountPath: "/home/user/.config/buildkit"
               readOnly: true
+            - name: ca
+              mountPath: "/etc/ssl/certs/"
           resources:
             requests:
               memory: "2148Mi"
@@ -78,6 +110,11 @@ spec:
         - name: buildkitd-config
           configMap:
             name: buildkitd-config
+        - name: ca-secret
+          secret:
+            secretName: wedding-docker-registry-proxy-ca
+        - name: ca
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: ServiceAccount

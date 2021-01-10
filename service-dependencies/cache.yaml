@@ -37,16 +37,31 @@ spec:
               cat /ca_secret/ca.key > /ca/ca.key
               cat /ca_secret/ca.srl > /ca/ca.srl
               /entrypoint.sh
+          env:
+            - name: ENABLE_MANIFEST_CACHE
+              value: "true"
+            - name: REGISTRIES
+              value: k8s.gcr.io gcr.io mirror.gcr.io registry.docker.io quay.io ghcr.io registry.gitlab.com
+            - name: MANIFEST_CACHE_PRIMARY_REGEX
+              value: "latest"
+            - name: MANIFEST_CACHE_PRIMARY_TIME
+              value: "1w"
+            - name: MANIFEST_CACHE_SECONDARY_REGEX
+              value: ""
+            - name: MANIFEST_CACHE_SECONDARY_TIME
+              value: ""
+            - name: MANIFEST_CACHE_DEFAULT_TIME
+              value: "1y"
           ports:
             - name: proxy
               containerPort: 3128
           resources:
             limits:
               cpu: "1000m"
-              memory: "100Mi"
+              memory: "1Gi"
             requests:
               cpu: "100m"
-              memory: "30Mi"
+              memory: "1Gi"
           livenessProbe:
             httpGet:
               path: /
@@ -56,7 +71,7 @@ spec:
               command:
               - sh
               - -c
-              - http_proxy=127.0.0.1:3128 wget -O /dev/null domain.tld
+              - http_proxy=http://127.0.0.1:3128 wget -O /dev/null domain.tld
           lifecycle:
             preStop:
               exec:

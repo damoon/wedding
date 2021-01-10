@@ -141,8 +141,6 @@ data:
           enabled: false
         readonly:
           enabled: false
-      redirect:
-        disable: true
     http:
       addr: :5000
       headers:
