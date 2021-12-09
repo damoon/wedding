@@ -8,3 +8,5 @@ cd tilt
 tilt down
 tilt ci --port 0
 tilt down
+
+echo "done"
