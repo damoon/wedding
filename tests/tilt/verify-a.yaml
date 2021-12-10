@@ -25,5 +25,5 @@ spec:
               sleep 5
           env:
             - name: "DOCKER_HOST"
-              value: "tcp://wedding:2376"
+              value: "tcp://wedding:2375"
       restartPolicy: Never

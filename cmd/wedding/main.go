@@ -37,7 +37,7 @@ func main() {
 				Name:  "server",
 				Usage: "Start the server.",
 				Flags: []cli.Flag{
-					&cli.StringFlag{Name: "addr", Value: ":2376", Usage: "Address to run service on."},
+					&cli.StringFlag{Name: "addr", Value: ":2375", Usage: "Address to run service on."},
 					&cli.StringFlag{Name: "s3-endpoint", Required: true, Usage: "s3 endpoint."},
 					&cli.StringFlag{Name: "s3-access-key-file", Required: true, Usage: "Path to s3 access key."},
 					&cli.StringFlag{Name: "s3-secret-key-file", Required: true, Usage: "Path to s3 secret access key."},

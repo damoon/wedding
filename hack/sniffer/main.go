@@ -16,15 +16,15 @@ import (
 func main() {
 	http.HandleFunc("/", sniffer)
 
-	log.Println("proxy http traffic from :23765 to http://127.0.0.1:2376")
+	log.Println("proxy http traffic from :23755 to http://127.0.0.1:2375")
 
-	if err := http.ListenAndServe(":23765", nil); err != nil {
+	if err := http.ListenAndServe(":23755", nil); err != nil {
 		log.Fatalf("listen and serve: %v", err)
 	}
 }
 
 func sniffer(w http.ResponseWriter, r *http.Request) {
-	err := serveReverseProxy("http://127.0.0.1:2376", w, r)
+	err := serveReverseProxy("http://127.0.0.1:2375", w, r)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return

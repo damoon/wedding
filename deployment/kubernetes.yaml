@@ -7,7 +7,7 @@ spec:
     app: wedding
   ports:
     - name: wedding
-      port: 2376
+      port: 2375
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -39,11 +39,11 @@ spec:
               value: "yes"
           ports:
             - name: wedding
-              containerPort: 2376
+              containerPort: 2375
           readinessProbe:
             httpGet:
               path: /_ping
-              port: 2376
+              port: 2375
           volumeMounts:
             - name: minio
               mountPath: "/secret/minio"

@@ -41,7 +41,7 @@ docker_build(
 
 k8s_resource(
   'wedding',
-  port_forwards=['12376:2376'],
+  port_forwards=['12375:2375'],
   resource_deps=['minio-buckets', 'registry', 'docker-hub-mirror'],
   labels=["application"],
 )
